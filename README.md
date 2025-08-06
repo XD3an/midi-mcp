@@ -30,9 +30,9 @@ uv sync
 uv run server.py --output_directory midi_output
 ```
 
-在支援 MCP Server 的 Client 端上（例如：Claude Desktop）設定：
+在支援 MCP Server 的 Client 端上（例如：Claude Desktop）設定，其中 `\\PATH\\TO\\midi-mcp\\src` 為實際的 MIDI MCP 檔案路徑，`\\PATH\\TO\\midi_output` 為輸出目錄：
 
-## Claude Desktop MCP Server 設定
+### Claude Desktop MCP Server 設定
 
 ```json
 {
@@ -58,7 +58,7 @@ uv run server.py --output_directory midi_output
 
 ### VSCde MCP Server 設定
 
-在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定，其中 \\PATH\\TO\\midi-mcp\\src 為實際的 MIDI MCP 檔案路徑，\\PATH\\TO\\midi_output 為輸出目錄：
+在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定：
 
 ```json
 {
