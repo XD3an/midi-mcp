@@ -1,569 +1,172 @@
-"""
-MIDI Generation MCP Server
-
-Supports:
-- MIDI file generation and editing
-- Music theory tools (chords, scales, rhythms)
-- Music style generation (classical, jazz, pop, etc.)
-- MIDI file analysis and conversion
-- Automatic piano playing support
-"""
-
 import argparse
+import json
 import os
-import sys
-from pathlib import Path
-from typing import Any, Dict, Tuple
 
+import mido
+import pygame
 from mcp.server.fastmcp import FastMCP
 
-current_dir = Path(__file__).parent
-parent_dir = current_dir.parent
-for p in [current_dir, parent_dir]:
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+parser = argparse.ArgumentParser(description="MIDI MCP server (Python version)")
+parser.add_argument(
+    "--output_directory",
+    type=str,
+    default="midi_output",
+    help="MIDI output directory (default: midi_output)"
+)
+args, unknown = parser.parse_known_args()
+default_output_dir = args.output_directory
 
-from core.config import config
-from core.exceptions import MidiFileError, MidiPlaybackError
-from core.midi_operations import MidiFileManager, MidiPlayer
-from core.music_generators import ClassicalMusicGenerator
-from core.music_theory import get_chord_info, get_scale_info
+mcp = FastMCP(
+    name="midi-mcp-server"
+)
 
-mcp = FastMCP("MIDI Generation Server")
-
-
-midi_manager = MidiFileManager(config.output_directory)
-midi_player = MidiPlayer()
-music_generator = ClassicalMusicGenerator(config.output_directory)
-
-
-# tool
 @mcp.tool()
-def create_midi_file(
-    filename: str = "output.mid",
-    tempo: int = 120,
-    time_signature_num: int = 4,
-    time_signature_den: int = 4
-) -> str:
-    """Create a new MIDI file in the output directory
-
-    Args:
-        filename: File name (without path, will be created in output directory)
-        tempo: Tempo (BPM)
-        time_signature_num: Time signature numerator (e.g., 4 for 4/4)
-        time_signature_den: Time signature denominator (e.g., 4 for 4/4)
-
-    Returns:
-        Creation success message with full path
+def create_midi(title: str = None, composition: dict = None, composition_file: str = None, output_path: str = None):
     """
+    使用 mido 庫生成 MIDI 檔案。
+
+    參數:
+    - title: MIDI 檔案的標題（用於檔名）。
+    - composition: 音樂作品的字典格式，包含 bpm、timeSignature 和 tracks。
+    - composition_file: 音樂作品的 JSON 檔案路徑（如果提供，則忽略 composition 參數）。
+    - output_path: 輸出檔案的路徑（只允許檔名，不含路徑，預設為 output_directory 下的檔名）。
+
+    返回:
+    - 成功訊息，包含生成的 MIDI 檔案路徑。
+    """
+    if not title:
+        raise ValueError("You must provide 'title' (英文) 作為檔名。")
+    # 若未指定輸出路徑，則自動放到 output_directory 下
+    # output_path 只允許檔名（不含路徑）
+    if output_path:
+        if os.path.basename(output_path) != output_path:
+            raise ValueError("output_path 只能是檔名，不能包含路徑。")
+        output_path = os.path.join(default_output_dir, output_path)
+    else:
+        output_path = os.path.join(default_output_dir, f"{title}.mid")
+
+    if not (composition or composition_file):
+        raise ValueError("You must provide either composition or composition_file.")
+
+    if composition_file:
+        try:
+            with open(composition_file, 'r', encoding='utf-8') as f:
+                composition = json.load(f)
+        except Exception as e:
+            raise ValueError(f"Failed to read JSON file: {e}")
+
+    abs_output_dir = os.path.abspath(default_output_dir)
+    abs_output_path = os.path.abspath(output_path)
+    if not abs_output_path.startswith(abs_output_dir + os.sep):
+        raise ValueError(f"Output path must be inside the output directory: {default_output_dir}")
+
+    # MIDI 生成
+    mid = mido.MidiFile()
+    bpm = composition.get('bpm', 120)
+    time_signature = composition.get('timeSignature', {'numerator': 4, 'denominator': 4})
+    tracks = composition.get('tracks', [])
+
+    for track_data in tracks:
+        track = mido.MidiTrack()
+        mid.tracks.append(track)
+        # 軌道名稱
+        if track_data.get('name'):
+            track.append(mido.MetaMessage('track_name', name=track_data['name']))
+        # 設定速度
+        tempo = mido.bpm2tempo(bpm)
+        track.append(mido.MetaMessage('set_tempo', tempo=tempo))
+        # 設定拍號
+        ts = time_signature
+        track.append(mido.MetaMessage('time_signature', numerator=ts.get('numerator',4), denominator=ts.get('denominator',4)))
+        # 設定樂器
+        if 'instrument' in track_data:
+            track.append(mido.Message('program_change', program=track_data['instrument'], time=0))
+        # 音符
+        abs_time = 0
+        for note in track_data.get('notes', []):
+            pitch = note.get('pitch', 60)
+            velocity = note.get('velocity', 100)
+            duration = note.get('duration', '4')
+            # 時值轉換為 tick
+            duration_map = {'1': 1920, '2': 960, '4': 480, '8': 240, '16': 120, '32': 60, '64': 30}
+            ticks = duration_map.get(str(duration), 480)
+            # 處理起始時間
+            start_tick = 0
+            if 'beat' in note:
+                start_tick = int((float(note['beat']) - 1) * 480)
+            elif 'startTime' in note:
+                start_tick = int(float(note['startTime']) * 480)
+            # 計算等待時間
+            delta = max(0, start_tick - abs_time)
+            abs_time = start_tick
+            track.append(mido.Message('note_on', note=int(pitch), velocity=velocity, time=delta))
+            track.append(mido.Message('note_off', note=int(pitch), velocity=velocity, time=ticks))
+            abs_time += ticks
+
+    # 處理輸出目錄
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    mid.save(output_path)
+    return f'MIDI file "{title}" has been generated and saved to {output_path}.'
+
+@mcp.tool()
+def play_midi(midi_path: str):
+    """
+    使用 pygame 播放指定的 MIDI 檔案。
+    """
+    # 初始化 pygame mixer
+    pygame.init()
     try:
-        time_signature = (time_signature_num, time_signature_den)
-        result = midi_manager.create_midi_file(filename, tempo, time_signature)
-        return f"{result}\nFile location: {Path(config.output_directory) / filename}"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def add_melody_to_midi(
-    filename: str,
-    melody_params: Dict[str, Any]
-) -> str:
-    """Add melody to MIDI file in the output directory
-
-    Args:
-        filename: File name (must exist in output directory)
-        melody_params: Melody parameters dictionary
-
-    Returns:
-        Addition result message with file location
-    """
-    try:
-        result = midi_manager.add_melody(filename, melody_params)
-        return f"{result}\nFile location: {Path(config.output_directory) / filename}"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def add_chord_progression(
-    filename: str,
-    progression_params: Dict[str, Any]
-) -> str:
-    """Add chord progression to MIDI file in the output directory
-
-    Args:
-        filename: File name (must exist in output directory)
-        progression_params: Chord progression parameters
-
-    Returns:
-        Addition result message with file location
-    """
-    try:
-        result = midi_manager.add_chord_progression(filename, progression_params)
-        return f"{result}\nFile location: {Path(config.output_directory) / filename}"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def add_drum_pattern(
-    filename: str,
-    drum_params: Dict[str, Any]
-) -> str:
-    """Add drum pattern to MIDI file in the output directory
-
-    Args:
-        filename: File name (must exist in output directory)
-        drum_params: Drum parameters
-
-    Returns:
-        Addition result message with file location
-    """
-    try:
-        result = midi_manager.add_drum_pattern(filename, drum_params)
-        return f"{result}\nFile location: {Path(config.output_directory) / filename}"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def generate_beethoven_symphony5() -> str:
-    """Generate Beethoven's Symphony No. 5 theme MIDI file in output directory
-
-    Returns:
-        Generation result message with file location
-    """
-    try:
-        result = music_generator.generate_beethoven_symphony5()
-        return f"{result}\nFile saved in: {config.output_directory}/"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def analyze_midi_file(filename: str) -> str:
-    """Analyze detailed information of a MIDI file in output directory
-
-    Args:
-        filename: File name (must exist in output directory)
-
-    Returns:
-        Analysis results with file location
-    """
-    try:
-        result = midi_manager.analyze_file(filename)
-        return f"{result}\nAnalyzed file: {Path(config.output_directory) / filename}"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def play_midi_file(filename: str) -> str:
-    """Play a MIDI file from the output directory
-
-    Args:
-        filename: File name (must exist in output directory)
-
-    Returns:
-        Playback result message with file location
-    """
-    try:
-        file_path = midi_manager._find_file(filename)
-        result = midi_player.play_file(file_path)
-        return f"{result}\nPlayed file: {Path(config.output_directory) / filename}"
-    except (MidiFileError, MidiPlaybackError) as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def list_chord_types() -> str:
-    """List supported chord types
-
-    Returns:
-        List of chord types
-    """
-    return get_chord_info()
-
-
-@mcp.tool()
-def list_scale_types() -> str:
-    """List supported scale types
-
-    Returns:
-        List of scale types
-    """
-    return get_scale_info()
-
-
-@mcp.tool()
-def convert_midi_to_text(filename: str) -> str:
-    """Convert MIDI file to text format for analysis
-
-    Args:
-        filename: File name (must exist in output directory)
-
-    Returns:
-        Text representation of MIDI content
-    """
-    try:
-        result = midi_manager.convert_to_text(filename)
-        return f"Text conversion of {Path(config.output_directory) / filename}:\n\n{result}"
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def list_midi_files() -> str:
-    """List all MIDI files in the output directory
-
-    Returns:
-        List of MIDI files with their sizes and modification times
-    """
-    try:
-        output_path = Path(config.output_directory)
-        if not output_path.exists():
-            return f"Output directory does not exist: {output_path.absolute()}"
-
-        midi_files = list(output_path.glob("*.mid")) + list(output_path.glob("*.midi"))
-
-        if not midi_files:
-            return f"No MIDI files found in: {output_path.absolute()}"
-
-        result = f"MIDI files in {output_path.absolute()}:\n\n"
-        for file_path in sorted(midi_files):
-            size_kb = file_path.stat().st_size / 1024
-            mtime = file_path.stat().st_mtime
-            from datetime import datetime
-            mod_time = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
-            result += f"📄 {file_path.name} ({size_kb:.1f} KB, modified: {mod_time})\n"
-
-        return result
-
+        pygame.mixer.init()
+        # 載入 MIDI 檔案
+        pygame.mixer.music.load(midi_path)
+        # 播放 MIDI
+        pygame.mixer.music.play()
+        # 等待播放結束
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
     except Exception as e:
-        return f"Error listing MIDI files: {str(e)}"
+        raise RuntimeError(f"Failed to play MIDI: {e}")
+    finally:
+        pygame.mixer.music.stop()
+        pygame.quit()
+    return f'MIDI file {midi_path} played successfully.'
 
-
-# Prompt
-@mcp.prompt()
-def midi_usage_guide() -> str:
-    """Complete MIDI MCP Server Usage Guide
-
-    A comprehensive guide covering all features and capabilities of the MIDI Generation MCP Server.
-    This guide includes step-by-step instructions, examples, and best practices for music creation,
-    analysis, and MIDI file manipulation.
-    """
-    return """
-# MIDI MCP Server Usage Guide
-This MCP server provides comprehensive MIDI music generation, editing, and analysis functionality
-with a modern, modular architecture designed for professional music creation workflows.
-
-
-## Core Concepts & MIDI Fundamentals
-
-### MIDI Technical Specifications
-- **Note Numbers**: 0-127 (Middle C = 60, A4 = 69, frequency 440Hz)
-- **Velocity**: 0-127 (note attack strength/volume)
-- **Duration**: Measured in ticks (standard: 480 ticks per quarter note)
-- **Channels**: 0-15 (Channel 9 reserved for percussion)
-- **Time Signature**: Standard 4/4, customizable to any meter
-
-### Advanced Features
-- **Classical Music Generation**: Pre-programmed famous compositions
-- **Enhanced Error Handling**: Robust error recovery and detailed diagnostics
-- **Modular Architecture**: Separated concerns for better performance
-- **Extended Music Theory**: Comprehensive chord and scale support
-
-## 🛠 Core Tool Functions
-
-### 1. File Creation & Management
-
-#### Create New MIDI File
-```
-Tool: create_midi_file
-Purpose: Initialize new MIDI file with tempo and time signature
-Parameters:
-- filename: "my_composition.mid" (filename only)
-- tempo: 120 (BPM, range: 60-200 recommended)
-- time_signature: (4, 4) or (3, 4), (6, 8), etc.
-```
-
-#### Analyze Existing MIDI Files
-```
-Tool: analyze_midi_file
-Purpose: Extract comprehensive information from MIDI files
-Parameters:
-- filename: "song.mid" (filename only)
-Returns: Track count, instruments, note ranges, tempo changes
-Enhanced: Detailed harmonic and rhythmic analysis
-```
-
-#### Convert to Human-Readable Format
-```
-Tool: convert_midi_to_text
-Purpose: Export MIDI events as readable text
-Parameters:
-- filename: "song.mid" (filename only)
-Format: Note names, timing, velocities, control changes
-```
-
-#### List MIDI Files
-```
-Tool: list_midi_files
-Purpose: Display all MIDI files in the current directory
-Returns: File names, sizes, modification dates
-```
-
-### 2. Advanced Music Generation
-
-#### Classical Music Generation
-```
-Tool: generate_beethoven_symphony5
-Purpose: Generate the famous opening of Beethoven's 5th Symphony
-Features: Orchestral arrangement, proper voice leading
-Output: Multi-track MIDI with melody and bass
-```
-
-### 3. Musical Element Addition
-
-#### Chord Progressions
-```
-Tool: add_chord_progression
-Purpose: Add harmonic foundation to compositions
-Parameters:
-- filename: "song.mid"
-- progression_params: {
-    "chords": ["Cmaj7", "Am7", "Fmaj7", "G7"],
-    "duration_per_chord": 1920 (2 beats at 480 tpqn),
-    "octave": 3,
-    "inversion": 0 (root position),
-    "voicing": "close" or "open"
-  }
-Supported Chord Types:
-- Triads: C, Cm, Cdim, Caug
-- Sevenths: Cmaj7, Cm7, C7, Cdim7, Cm7b5
-- Extensions: C9, Cmaj9, Cm9, C11, C13
-- Suspended: Csus2, Csus4
-```
-
-#### Melodic Content
-```
-Tool: add_melody_to_midi
-Purpose: Generate melodic lines based on scales and patterns
-Parameters:
-- filename: "song.mid"
-- melody_params: {
-    "scale": "major", "minor", "dorian", "pentatonic", "blues"
-    "key": "C", "F#", "Bb" (any chromatic pitch)
-    "octave": 5 (recommended: 4-6 for melody)
-    "note_count": 32,
-    "rhythm_pattern": [240, 240, 480, 240] (custom rhythms)
-    "phrase_length": 8 (notes per phrase)
-  }
-```
-
-#### Drum Patterns
-```
-Tool: add_drum_pattern
-Purpose: Add rhythmic foundation
-Parameters:
-- filename: "song.mid"
-- drum_params: {
-    "pattern": "rock", "jazz", "latin", "electronic"
-    "bars": 8,
-    "complexity": "simple", "medium", "complex"
-  }
-```
-
-### 4. Playback & Testing
-
-#### MIDI Playback
-```
-Tool: play_midi_file
-Purpose: Immediate playback for testing compositions
-Parameters:
-- filename: "song.mid"
-Requirements: System MIDI output or software synthesizer
-Enhanced: Better error handling, file validation
-```
-
-## Complete Workflow Examples
-
-### Example 1: Creating a Jazz Ballad
-```
-1. create_midi_file("jazz_ballad.mid", 80, (4, 4))
-2. add_chord_progression("jazz_ballad.mid", {
-     "chords": ["Cmaj7", "A7", "Dm7", "G7", "Em7", "A7", "Dm7", "G7"],
-     "duration_per_chord": 1920,
-     "octave": 3
-   })
-3. add_melody_to_midi("jazz_ballad.mid", {
-     "scale": "major",
-     "key": "C",
-     "octave": 5,
-     "note_count": 64,
-     "rhythm_pattern": [480, 240, 240, 480, 480]
-   })
-4. play_midi_file("jazz_ballad.mid")
-5. analyze_midi_file("jazz_ballad.mid")
-```
-
-### Example 2: Classical Composition Study
-```
-1. generate_beethoven_symphony5()
-2. list_midi_files()  # See all available files
-3. analyze_midi_file("beethoven_symphony5.mid")
-4. convert_midi_to_text("beethoven_symphony5.mid")
-```
-
-## Music Theory Reference
-
-### Extended Scale Types
-- **Major Modes**: Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
-- **Minor Variations**: Natural, Harmonic, Melodic minor
-- **Pentatonic**: Major pentatonic, Minor pentatonic, Blues scale
-- **Exotic**: Whole tone, Diminished, Chromatic
-
-### Advanced Chord Theory
-- **Functional Harmony**: I-vi-IV-V progressions, Secondary dominants
-- **Jazz Harmony**: Altered dominants, Tritone substitutions, Extended chords
-- **Modal Harmony**: Chord progressions from church modes
-- **Contemporary**: Quartal/quintal harmony, Polychords
-
-### Rhythm Patterns (in ticks, 480 = quarter note)
-- **Simple**: [480, 480, 480, 480] (quarter notes)
-- **Syncopated**: [240, 720, 240, 240] (eighth-dotted quarter-eighth)
-- **Triplets**: [320, 320, 320] (quarter note triplets)
-- **Complex**: [120, 360, 240, 480, 240] (mixed subdivisions)
-
-## Resource Access
-
-### MIDI File Resources
-```
-Resource: midi://file/{filename}
-Purpose: Direct access to MIDI file content as text
-Usage: For debugging, analysis, and custom processing
-```
-
-### Analysis Resources
-```
-Resource: midi://analysis/{filename}
-Purpose: Structured analysis data
-Content: JSON-formatted track and harmonic information
-```
-
-## Best Practices & Tips
-
-### For Beginners
-- Start with simple chord progressions: C-Am-F-G or I-vi-IV-V
-- Use basic major and minor scales initially
-- Set moderate tempos (80-120 BPM) for learning
-- Always analyze generated files to understand MIDI structure
-
-### For Intermediate Users
-- Use extended chords: maj7, min7, dom7 for richer harmony
-- Try different modes: Dorian, Mixolydian for variety
-- Combine multiple generation techniques in single compositions
-- Study classical examples for voice leading principles
-
-### For Advanced Users
-- Create complex chord progressions with secondary dominants
-- Use multiple scales within compositions for modulation
-- Analyze and modify MIDI programmatically using text conversion
-- Experiment with polyrhythms and metric modulation
-
-## Technical Implementation Notes
-
-### File Management
-- File naming: Use descriptive names with .mid extension (filename only)
-- File listing: Use list_midi_files() to see all available files
-- All operations work with filenames only, no paths needed
-
-### Performance Optimization
-- Modular architecture reduces memory usage
-- Enhanced error handling prevents crashes
-- Efficient MIDI parsing for large files
-- Optimized playback system with hardware acceleration
-
-### Error Handling
-- Specific error types: MidiFileError, MidiPlaybackError, MusicTheoryError
-- Graceful degradation: Partial results when possible
-- Detailed error messages with suggested solutions
-- Automatic recovery for common issues
-
-## Audio Setup & Playback
-
-### System Requirements
-- Windows: Built-in MIDI support
-- macOS: Core Audio MIDI services
-- Linux: ALSA/PulseAudio with MIDI support
-
-### Software Synthesizers (Recommended)
-- FluidSynth: High-quality sample-based synthesis
-- TiMidity++: Classic software synthesizer
-- Virtual Studio Technology (VST): Professional plugin support
-
-### Hardware MIDI
-- USB MIDI keyboards: Plug-and-play compatibility
-- Professional audio interfaces: Low-latency performance
-- Dedicated sound modules: Hardware synthesis
-
-This comprehensive guide covers all aspects of the MIDI Generation MCP Server.
-Experiment with different combinations of tools and parameters to create unique musical compositions!
-"""
-
-
-# Resource
-@mcp.resource("midi://file/{filename}")
-def get_midi_file_content(filename: str) -> str:
-    """Get detailed content of MIDI file"""
-    try:
-        return midi_manager.convert_to_text(filename)
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.resource("midi://analysis/{filename}")
-def get_midi_analysis(filename: str) -> str:
-    """Get analysis results of MIDI file"""
-    try:
-        return midi_manager.analyze_file(filename)
-    except MidiFileError as e:
-        return f"Error: {str(e)}"
-
-
-def main():
-    """Start MCP server with optional output directory parameter"""
-    parser = argparse.ArgumentParser(description="MIDI Generation MCP Server")
-    parser.add_argument(
-        "--output_directory",
-        type=str,
-        default="midi_output",
-        help="Directory for MIDI file output (default: midi_output)"
+@mcp.prompt(title="How to compose music with midi-mcp")
+def midi_mcp_composing_guide() -> str:
+    """Prompt for LLM: How to use midi-mcp to compose music (English)."""
+    return (
+        "You are an AI music assistant. To compose music using the midi-mcp server, follow these steps:\n"
+        "1. Prepare a composition dictionary in Python or JSON format.\n"
+        "   - The structure should include: bpm, timeSignature, and one or more tracks.\n"
+        "   - Each track should have: name, instrument (as General MIDI program number), and a list of notes.\n"
+        "   - Each note should specify: pitch (MIDI number), velocity, duration (note length, e.g., 4 for quarter note), and beat (start position).\n"
+        "2. To create a MIDI file, call the create_midi tool with arguments: title, composition (dict), and output_path (filename only, no path).\n"
+        "3. To play a MIDI file, call the play_midi tool with the midi_path (full file path).\n"
+        "4. Example composition dict:\n"
+        "   {\n"
+        "     'bpm': 120,\n"
+        "     'timeSignature': {'numerator': 4, 'denominator': 4},\n"
+        "     'tracks': [\n"
+        "       {\n"
+        "         'name': 'Piano',\n"
+        "         'instrument': 0,\n"
+        "         'notes': [\n"
+        "           {'pitch': 60, 'velocity': 100, 'duration': 4, 'beat': 1},\n"
+        "           {'pitch': 64, 'velocity': 100, 'duration': 4, 'beat': 2},\n"
+        "           {'pitch': 67, 'velocity': 100, 'duration': 4, 'beat': 3}\n"
+        "         ]\n"
+        "       }\n"
+        "     ]\n"
+        "   }\n"
+        "5. For chords, add multiple notes with the same beat.\n"
+        "6. For polyphonic/multi-track music, add more tracks.\n"
+        "7. Use only filename (not path) for output_path.\n"
+        "8. The server will save MIDI files to the default output directory.\n"
+        "9. For more details, see the midi-mcp server documentation or ask for more examples.\n"
     )
 
-    args = parser.parse_args()
-
-    try:
-        # Set the output directory from command line argument
-        config.output_directory = args.output_directory
-        output_path = config.ensure_output_directory()
-
-        # Initialize components with the specified directory
-        global midi_manager, music_generator
-        midi_manager = MidiFileManager(str(output_path))
-        music_generator = ClassicalMusicGenerator(str(output_path))
-
-
-        # Start server
-        mcp.run()
-
-    except KeyboardInterrupt:
-        print("\nServer stopped by user")
-    except Exception as e:
-        print(f"Server error: {e}")
-        raise
-
-
 if __name__ == "__main__":
-    main()
+    mcp.run()
+    mcp.run()

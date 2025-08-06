@@ -4,16 +4,23 @@
       "command": "uv",
       "args": [
         "--directory",
-        "\\PATH\\TO\\midi-mcp\\src",
+        "D:\\All_In_One\\Documents\\Project\\github\\midi-mcp\\src",
         "run",
         "server.py",
         "--output_directory",
-        "\\PATH\\TO\\midi_output"
+        "D:\\All_In_One\\Documents\\Project\\github\\midi-mcp\\midi_output"
       ]
     },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    // "midi-mcp-server": {
+    //   "command": "node",
+    //   "args": [
+    //     "D:\\All_In_One\\Documents\\Project\\github\\midi-mcp\\midi-mcp-server\\build\\index.js"
+    //   ],
+    //   "env": {}
+    // },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
     }
   }
 }
