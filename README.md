@@ -35,16 +35,24 @@ uv run server.py --output_directory midi_output
 ## Claude Desktop MCP Server 設定
 
 ```json
-"midi-mcp": {
-  "command": "uv",
-  "args": [
-    "--directory",
-    "D:/All_In_One/Documents/Project/github/auto-midi-piano/src/ai/midi-mcp/",
-    "run",
-    "server.py",
-    "--output_directory",
-    "D:/All_In_One/Documents/Project/github/auto-midi-piano/src/ai/midi-mcp/midi_output"
-  ]
+{
+  "mcpServers": {
+    "midi-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "\\PATH\\TO\\midi-mcp\\src",
+        "run",
+        "server.py",
+        "--output_directory",
+        "\\PATH\\TO\\midi_output"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
 }
 ```
 
@@ -54,7 +62,6 @@ uv run server.py --output_directory midi_output
 
 ```json
 {
-  "version": "1.0",
   "servers": {
     "midi-mcp": {
       "command": "uv",
