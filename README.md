@@ -56,7 +56,7 @@ uv run server.py --output_directory midi_output
 }
 ```
 
-### VSCde MCP Server 設定
+### VSCode MCP Server 設定
 
 在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定：
 
