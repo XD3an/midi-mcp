@@ -1,100 +1,132 @@
 # midi-mcp
 
-## 可用工具
+A Model Context Protocol (MCP) server that provides MIDI file generation and playback features.
 
-- **create_midi**：產生 MIDI 檔案。
+## Available Tools
 
-  - 參數：
-    - `title`：MIDI 檔案標題（作為檔名）。
-    - `composition`：描述樂曲的字典（BPM、拍號、軌道、音符）。
-    - `composition_file`：包含樂曲資料的 JSON 檔案路徑。
-    - `output_path`：輸出檔名（僅檔名，不含路徑），預設儲存於指定輸出目錄。
-  - 回傳：成功訊息與檔案路徑。
+- **create_midi**: Generate a MIDI file.
 
-- **play_midi**：播放指定 MIDI 檔案。
-  - 參數：
-    - `midi_path`：MIDI 檔案完整路徑。
-  - 回傳：播放成功訊息。
+  - Parameters:
+    - `title`: MIDI file title (used as filename).
+    - `composition`: A dictionary describing the composition (BPM, time signature, tracks, notes).
+    - `composition_file`: Path to a JSON file containing the composition data.
+    - `output_path`: Output filename (name only, no path), default is saved to the specified output directory.
+  - Returns: Success message and file path.
 
-## 快速安裝與啟動
+- **play_midi**: Play a specified MIDI file.
+  - Parameters:
+    - `midi_path`: Full path to the MIDI file.
+  - Returns: Playback success message.
 
-1. 安裝依賴：
+## Quick Installation & Startup
 
-   從專案根目錄執行：
+1. Install dependencies:
+
+   From the project root directory, run:
 
    ```bash
    uv sync
    ```
 
-2. 啟動伺服器（可自訂輸出目錄）：
+2. Start the server (output directory can be customized):
 
-   ```bash
-   uv run server.py --output_directory midi_output
-   ```
+Configure your MCP-compatible client (e.g., Claude Desktop) as follows, where `\\PATH\\TO\\midi-mcp\\src` is the actual path to the MIDI MCP source, and `\\PATH\\TO\\midi_output` is the output directory:
 
-   在支援 MCP Server 的 Client 端上（例如：Claude Desktop）設定，其中 `\\PATH\\TO\\midi-mcp\\src` 為實際的 MIDI MCP 檔案路徑，`\\PATH\\TO\\midi_output` 為輸出目錄：
+### Claude Desktop MCP Server Configuration
 
-   ### Claude Desktop MCP Server 設定
-
-   ```json
-   {
-     "mcpServers": {
-       "midi-mcp": {
-         "command": "uv",
-         "args": [
-           "--directory",
-           "\\PATH\\TO\\midi-mcp\\src",
-           "run",
-           "server.py",
-           "--output_directory",
-           "\\PATH\\TO\\midi_output"
-         ]
-       },
-       "sequential-thinking": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-       }
-     }
-   }
-   ```
-
-   ### VSCode MCP Server 設定
-
-   在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定：
-
-   ```json
-   {
-     "servers": {
-       "midi-mcp": {
-         "command": "uv",
-         "args": [
-           "--directory",
-           "\\PATH\\TO\\midi-mcp\\src",
-           "run",
-           "server.py",
-           "--output_directory",
-           "\\PATH\\TO\\midi_output"
-         ]
-       },
-       "sequential-thinking": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-       }
-     }
-   }
-   ```
-
-## 使用說明
-
-你可以對支援 MCP 的 LLM 發出如下指令：
-
-```
-我想要創作一首純鋼琴曲，請生成一個 C 大調的旋律，並包含和弦，最後播放出來。
+```json
+{
+  "mcpServers": {
+    "midi-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "\\PATH\\TO\\midi-mcp\\src",
+        "run",
+        "server.py",
+        "--output_directory",
+        "\\PATH\\TO\\midi_output"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}
 ```
 
-LLM 會自動呼叫 `create_midi` 產生樂曲，再呼叫 `play_midi` 播放。
+### VSCode MCP Server Configuration
 
-### 範例 composition 結構：
+In your project, configure [.vscode/mcp.json](.vscode/mcp.json):
+
+```json
+{
+  "servers": {
+    "midi-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "\\PATH\\TO\\midi-mcp\\src",
+        "run",
+        "server.py",
+        "--output_directory",
+        "\\PATH\\TO\\midi_output"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}
+```
+
+## Usage
+
+You can tell the LLM to generate MIDI compositions by providing a description of the desired piece. The server will handle the creation and playback of the MIDI files.
+
+### Example Prompts
+
+> I want to compose a pure piano piece. Please generate a C major melody with chords and play it.
+
+> Create a fast-paced rock-style MIDI with drum beats and electric bass at 150 BPM. Then play the result.
+
+> Compose a classical-style waltz in D minor, 3/4 time, 90 BPM. Include arpeggiated chords in the left hand and a lyrical melody in the right hand. Generate and play the MIDI.
+
+> I want a relaxing jazz piano solo in F major, 4/4, 120 BPM. Include some swing feel. Create and play the MIDI.
+
+> I'm feeling melancholic. Please compose a slow, sad piano piece in A minor with a gentle melody and subtle harmonies. Then play it.
+
+> I’m in a good mood today. Create a cheerful and bright piano tune in C major, 4/4, 120 BPM with upbeat rhythms and catchy melody. Play the MIDI.
+
+> I just went through heartbreak. Compose a solo piano piece that expresses deep emotional pain and longing in D minor. Slow tempo. Then play it.
+
+> I want to relax and clear my mind. Generate a minimalistic, ambient-style composition with soft piano and slow BPM (around 60). Play the result.
+
+> I’m feeling angry. Create a high-intensity MIDI piece with fast, aggressive rhythms and dissonant chords, preferably using orchestral percussion and strings. Play it.
+
+> I feel nervous and anxious. Compose a tense, repetitive piano motif in a minor key with uneven rhythm to reflect unease. Play the composition.
+
+> I’m falling in love. Please write a romantic and dreamy piano piece in E♭ major, moderate tempo, with expressive harmonies. Then play it.
+
+> Compose an uplifting orchestral piece using multiple instruments, including piano, strings, brass, woodwinds, and percussion.
+>
+> The composition should be in 4/4 time at 110 BPM and evoke a sense of adventure and triumph.
+>
+> Structure it into 3 sections:
+>
+> Intro with soft strings and solo flute
+>
+> Build-up with horns, piano chords, and rhythmic percussion
+>
+> Climax with full orchestration and layered harmonies
+>
+> Then generate the MIDI file and play it.
+
+The LLM will automatically call `create_midi` to generate the composition, then call `play_midi` to play it.
+
+### Example composition structure:
 
 ```json
 {
@@ -127,12 +159,14 @@ LLM 會自動呼叫 `create_midi` 產生樂曲，再呼叫 `play_midi` 播放。
 }
 ```
 
-### 檔案輸出
+### File Output
 
-所有產生的 MIDI 檔案會自動儲存在啟動伺服器時指定的 `--output_directory` 目錄（預設為 `midi_output/`）。
+All generated MIDI files are automatically saved in the `--output_directory` specified when starting the server (default is `midi_output/`).
 
----
+## Reference
 
-## 授權
+- [tubone24/midi-mcp-server](https://github.com/tubone24/midi-mcp-server)
 
-本專案採用 MIT 授權。詳見 [../LICENCE](../LICENCE)。
+## License
+
+This project is licensed under the MIT License. See [../LICENCE](../LICENCE) for details.
