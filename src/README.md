@@ -1,104 +1,53 @@
-# midi-mcp
+# MIDI MCP Server (Python)
 
-本目錄為 MIDI MCP 伺服器的 Python 實作，支援透過 Model Context Protocol (MCP) 創建與播放 MIDI 檔案。
+This directory contains the Python implementation of the MIDI MCP server. It allows for the creation and playback of MIDI files through the Model Context Protocol (MCP).
 
-## 可用工具
+## Available Tools
 
 - **`create_midi(title: str, composition: dict = None, composition_file: str = None, output_path: str = None)`**
 
-  - 使用 `mido` 函式庫生成 MIDI 檔案。
-  - **參數說明：**
-    - `title`：MIDI 檔案標題（作為檔名）。
-    - `composition`：描述樂曲內容的字典（BPM、拍號、軌道、音符等）。
-    - `composition_file`：包含樂曲資料的 JSON 檔案路徑。
-    - `output_path`：輸出檔名（僅檔名，不含路徑），預設儲存於指定輸出目錄。
-  - **回傳：** 成功訊息與生成的 MIDI 檔案路徑。
+  - Generates a MIDI file using the `mido` library.
+  - **Parameters:**
+    - `title`: The title of the MIDI file (used for the filename).
+    - `composition`: A dictionary describing the musical piece (BPM, time signature, tracks, notes).
+    - `composition_file`: Path to a JSON file containing the composition data.
+    - `output_path`: The name of the output file (filename only, no path). Defaults to saving in the specified output directory.
+  - **Returns:** A success message with the path to the generated MIDI file.
 
 - **`play_midi(midi_path: str)`**
-  - 使用 `pygame` 播放指定的 MIDI 檔案。
-  - **參數說明：**
-    - `midi_path`：要播放的 MIDI 檔案完整路徑。
-  - **回傳：** 播放完成訊息。
+  - Plays a specified MIDI file using `pygame`.
+  - **Parameters:**
+    - `midi_path`: The full path to the MIDI file to be played.
+  - **Returns:** A success message upon completion.
 
-## 快速安裝與啟動
+## Quick Installation and Startup
 
-1. 安裝依賴：
+1.  **Install dependencies:**
+    From the root directory of the project, run:
 
-```bash
-uv sync
-```
+    ```bash
+    uv sync
+    ```
 
-2. 啟動伺服器（可自訂輸出目錄）：
+2.  **Start the server:**
+    Navigate to the `src` directory or use the `--directory` flag to run the server. You can specify an output directory for the MIDI files.
+    ```bash
+    uv run server.py --output_directory ../midi_output
+    ```
 
-```bash
-uv run server.py --output_directory midi_output
-```
+## Usage Example
 
-在支援 MCP Server 的 Client 端上（例如：Claude Desktop）設定，其中 `\\PATH\\TO\\midi-mcp\\src` 為實際的 MIDI MCP 檔案路徑，`\\PATH\\TO\\midi_output` 為輸出目錄：
+To use the server, you can send a request to an LLM capable of interacting with MCP servers.
 
-### Claude Desktop MCP Server 設定
-
-```json
-{
-  "mcpServers": {
-    "midi-mcp": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "\\PATH\\TO\\midi-mcp\\src",
-        "run",
-        "server.py",
-        "--output_directory",
-        "\\PATH\\TO\\midi_output"
-      ]
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    }
-  }
-}
-```
-
-### VSCode MCP Server 設定
-
-在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定：
-
-```json
-{
-  "servers": {
-    "midi-mcp": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "\\PATH\\TO\\midi-mcp\\src",
-        "run",
-        "server.py",
-        "--output_directory",
-        "\\PATH\\TO\\midi_output"
-      ]
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    }
-  }
-}
-```
-
-## 使用範例
-
-可透過支援 MCP 的 LLM 進行互動。
-
-**用戶提示：**
+**User Prompt:**
 
 ```
-我想要創作一首純鋼琴曲，請生成一個 C 大調的旋律，並包含和弦，最後播放出來。
+I want to create a piano piece. Please generate a melody in C major with some chords, and then play it for me.
 ```
 
-LLM 會自動呼叫 `create_midi` 產生樂曲，再呼叫 `play_midi` 播放。
+The LLM will then use the available tools to fulfill the request. It will first call `create_midi` with a composition structure, and then call `play_midi` to play the resulting file.
 
-### `composition` 結構範例：
+### Example `composition` structure:
 
 ```json
 {
@@ -131,10 +80,12 @@ LLM 會自動呼叫 `create_midi` 產生樂曲，再呼叫 `play_midi` 播放。
 }
 ```
 
-### 檔案輸出
+### File Output
 
-所有生成的 MIDI 檔案將儲存於啟動伺服器時 `--output_directory` 指定的目錄（預設為上層的 `midi_output/`）。
+All generated MIDI files will be saved to the directory specified by the `--output_directory` argument when starting the server (defaults to `midi_output/` in the parent directory).
+
+---
 
 ## 授權
 
-[MIT LICENCE](./LICENCE)
+本專案採用 MIT 授權。詳見 [../LICENCE](../LICENCE)。
