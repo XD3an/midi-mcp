@@ -3,6 +3,7 @@
 ## 可用工具
 
 - **create_midi**：產生 MIDI 檔案。
+
   - 參數：
     - `title`：MIDI 檔案標題（作為檔名）。
     - `composition`：描述樂曲的字典（BPM、拍號、軌道、音符）。
@@ -19,69 +20,69 @@
 
 1. 安裝依賴：
 
-    從專案根目錄執行：
+   從專案根目錄執行：
 
-    ```bash
-    uv sync
-    ```
+   ```bash
+   uv sync
+   ```
 
 2. 啟動伺服器（可自訂輸出目錄）：
 
-    ```bash
-    uv run server.py --output_directory midi_output
-    ```
+   ```bash
+   uv run server.py --output_directory midi_output
+   ```
 
-    在支援 MCP Server 的 Client 端上（例如：Claude Desktop）設定，其中 `\\PATH\\TO\\midi-mcp\\src` 為實際的 MIDI MCP 檔案路徑，`\\PATH\\TO\\midi_output` 為輸出目錄：
+   在支援 MCP Server 的 Client 端上（例如：Claude Desktop）設定，其中 `\\PATH\\TO\\midi-mcp\\src` 為實際的 MIDI MCP 檔案路徑，`\\PATH\\TO\\midi_output` 為輸出目錄：
 
-    ### Claude Desktop MCP Server 設定
+   ### Claude Desktop MCP Server 設定
 
-    ```json
-    {
-      "mcpServers": {
-        "midi-mcp": {
-          "command": "uv",
-          "args": [
-            "--directory",
-            "\\PATH\\TO\\midi-mcp\\src",
-            "run",
-            "server.py",
-            "--output_directory",
-            "\\PATH\\TO\\midi_output"
-          ]
-        },
-        "sequential-thinking": {
-          "command": "npx",
-          "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-        }
-      }
-    }
-    ```
+   ```json
+   {
+     "mcpServers": {
+       "midi-mcp": {
+         "command": "uv",
+         "args": [
+           "--directory",
+           "\\PATH\\TO\\midi-mcp\\src",
+           "run",
+           "server.py",
+           "--output_directory",
+           "\\PATH\\TO\\midi_output"
+         ]
+       },
+       "sequential-thinking": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+       }
+     }
+   }
+   ```
 
-    ### VSCode MCP Server 設定
+   ### VSCode MCP Server 設定
 
-    在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定：
+   在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定：
 
-    ```json
-    {
-      "servers": {
-        "midi-mcp": {
-          "command": "uv",
-          "args": [
-            "--directory",
-            "\\PATH\\TO\\midi-mcp\\src",
-            "run",
-            "server.py",
-            "--output_directory",
-            "\\PATH\\TO\\midi_output"
-          ]
-        },
-        "sequential-thinking": {
-          "command": "npx",
-          "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-        }
-      }
-    }
-    ```
+   ```json
+   {
+     "servers": {
+       "midi-mcp": {
+         "command": "uv",
+         "args": [
+           "--directory",
+           "\\PATH\\TO\\midi-mcp\\src",
+           "run",
+           "server.py",
+           "--output_directory",
+           "\\PATH\\TO\\midi_output"
+         ]
+       },
+       "sequential-thinking": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+       }
+     }
+   }
+   ```
 
 ## 使用說明
 
