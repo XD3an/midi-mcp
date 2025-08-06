@@ -52,7 +52,7 @@ uv run server.py --output_directory midi_output
 
 在專案下的 [.vscode/mcp.json](.vscode/mcp.json) 檔案中設定，其中 \\PATH\\TO\\midi-mcp\\src 為實際的 MIDI MCP 檔案路徑，\\PATH\\TO\\midi_output 為輸出目錄：
 
-````json
+```json
 {
   "version": "1.0",
   "servers": {
@@ -73,7 +73,7 @@ uv run server.py --output_directory midi_output
     }
   }
 }
-
+```
 
 ## 使用說明
 
@@ -121,4 +121,7 @@ convert_midi_to_text("my_song.mid")
 ## 參考資料
 
 - [Mido Documentation](https://mido.readthedocs.io/en/stable/)
-````
+
+```
+
+```
