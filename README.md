@@ -121,7 +121,3 @@ convert_midi_to_text("my_song.mid")
 ## 參考資料
 
 - [Mido Documentation](https://mido.readthedocs.io/en/stable/)
-
-```
-
-```
